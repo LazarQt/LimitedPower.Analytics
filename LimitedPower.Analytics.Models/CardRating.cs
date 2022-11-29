@@ -2,15 +2,6 @@
 
 namespace LimitedPower.Analytics.Models
 {
-    public class CardRating : CardRatingModel
-    {
-        public int Id { get; set; }
-
-        public DraftType DraftType { get; set; }
-        public DataTimespan DataTimespan { get; set; }
-        public ColorCombination DeckColor { get; set; }
-    }
-
     public class CardRatingModel
     {
         [JsonPropertyName("seen_count")]

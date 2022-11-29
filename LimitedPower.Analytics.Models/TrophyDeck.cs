@@ -1,18 +1,8 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
+﻿using System.Collections.Generic;
 using System.Text.Json.Serialization;
 
 namespace LimitedPower.Analytics.Models
 {
-    public class TrophyDeck : TrophyDeckModel
-    {
-        public int Id { get; set; }
-        public bool LimitedEventSaved { get; set; } = false;
-        public DraftType DraftType { get; set; }
-        public Set Set { get; set; }
-    }
-
     public class TrophyDeckModel
     {
         [JsonPropertyName("wins")]

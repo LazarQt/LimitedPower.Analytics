@@ -2,11 +2,6 @@
 
 namespace LimitedPower.Analytics.Models
 {
-    public class LimitedEvent : LimitedEventModel
-    {
-        public int Id { get; set; }
-    }
-
     public class LimitedEventModel
     {
         [JsonPropertyName("event_info")]

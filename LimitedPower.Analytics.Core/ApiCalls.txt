@@ -1,5 +1,0 @@
-﻿Base: https://limitedpoweranalyticsapi20220919193307.azurewebsites.net
-
-Delete:
-https://limitedpoweranalyticsapi20220919193307.azurewebsites.net/api/delete/cardratings
-

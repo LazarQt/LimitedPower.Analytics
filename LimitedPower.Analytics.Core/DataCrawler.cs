@@ -16,51 +16,23 @@ namespace LimitedPower.Analytics.Core
             _seventeenLandsApi = seventeenLandsApi;
         }
 
-        public void DeleteCardRatings()
-        {
-            _liteDb.GetCollection<CardRating>(Const.Db.CardRatingsTable).Delete(e => true);
-        }
-
-        public void UpdateCardRatings(Set set, DraftType draftType, DataTimespan dataTimespan, ColorCombination colorCombination)
-        {
-            var endDate = DateTime.Now;
-
-            var startDate = dataTimespan switch
-            {
-                DataTimespan.All => DateTime.MinValue,
-                DataTimespan.Recent => endDate.AddDays(Const.RecentDays),
-                _ => DateTime.MinValue
-            };
-
-            var cardRatingsColumn = _liteDb.GetCollection<CardRating>(Const.Db.CardRatingsTable);
-            cardRatingsColumn.InsertBulk(GatherCardRatingsData(set, draftType, startDate, endDate, dataTimespan, colorCombination));
-
-            Console.WriteLine($"Updated card ratings for {draftType} ({dataTimespan}), color combination used: {colorCombination}");
-        }
-
-        public void DeleteTrophyDecks()
-        {
-#if DEBUG
-            // NEVER execute on live data
-            _liteDb.GetCollection<CardRating>(Const.Db.TrophyDecks).Delete(true);
-#endif
-        }
-
         public void UpdateTrophyDecks(Set set, DraftType draftType)
         {
             //var trophyDecksColumn = _liteDb.GetCollection<TrophyDeck>(Const.Db.TrophyDecks);
 
             var existingTrophyDecks = JsonSerializer.Deserialize<TrophyDeckModel[]>(File.ReadAllText($"{draftType}-{set}.json")).ToList();
             var existingTrophyDeckIds = existingTrophyDecks.Select(i => i.Id);
-
-            var trophyDecks = GatherTrophyDecksData(set, draftType).ToList().Where(x=> !existingTrophyDeckIds.Contains(x.Id));
+            var i = 0;
+            var trophyDecks = GatherTrophyDecksData(set, draftType).ToList().Where(x=> !existingTrophyDeckIds.Contains(x.Id)).ToList();
             foreach(var td in trophyDecks)
             {
-                Console.WriteLine($"grabbing deck data for {td.Id}");
+                i++;
+                Console.WriteLine($"grabbing deck data {draftType} for {td.Id} ({i}/{trophyDecks.Count})");
                 var eventData = GatherLimitedEventData(td.Id, td.DeckIndex);
                 td.Cards = eventData.Groups[0].Cards.Select(i => i.Name);
 
                 existingTrophyDecks.Add(td);
+                File.WriteAllText($"{draftType}-{set}.json", JsonSerializer.Serialize(existingTrophyDecks));
             }
             //var aggregateIds = trophyDecks.Select(t => t.Id).ToList();
             //var exitingTrophyDeckEntries = trophyDecksColumn.Find(c => aggregateIds.Contains(c.Id))
@@ -76,29 +48,21 @@ namespace LimitedPower.Analytics.Core
             //}
 
             //var n = DateTime.Now.ToString("yyyyMMddHHmmssfff");
-            File.WriteAllText($"{draftType}-{set}.json", JsonSerializer.Serialize(existingTrophyDecks));
+            //File.WriteAllText($"{draftType}-{set}.json", JsonSerializer.Serialize(existingTrophyDecks));
 
             Console.WriteLine($"Updated trophy decks for {draftType}");
         }
 
-        public IEnumerable<TrophyDeck> GetUnsavedTrophyDecks()
+        public void DoAnalytics()
         {
-            var trophyDecksColumn = _liteDb.GetCollection<TrophyDeck>(Const.Db.TrophyDecks);
-            return trophyDecksColumn.Find(d => d.LimitedEventSaved == false);
-        }
+            var tds = JsonSerializer.Deserialize<TrophyDeckModel[]>(File.ReadAllText($"d/PremierDraft-BRO.json")).ToList();
+            tds = tds.Where(x=>x.EndRank != null && (x.EndRank.Contains("Diamond") || x.EndRank.Contains("Mythic"))).ToList();
 
-        public void UpdateLimitedEvent(int trophyDeckId)
-        {
-            var trophyDecksColumn = _liteDb.GetCollection<TrophyDeck>(Const.Db.TrophyDecks);
-            var limitedEventsColumns = _liteDb.GetCollection<LimitedEvent>(Const.Db.LimitedEvents);
-
-            var trophyDeck = trophyDecksColumn.FindById(trophyDeckId);
-
-            //var limitedEvent = GatherLimitedEventData(trophyDeck.Id, trophyDeck.DeckIndex);
-            //limitedEventsColumns.Insert(limitedEvent);
-
-            //trophyDeck.LimitedEventSaved = true;
-            //trophyDecksColumn.Update(trophyDeck);
+            var colors = tds.GroupBy(d=>d.Colors).OrderByDescending(x=>x.Count()); 
+            foreach(var c in colors)
+            {
+                Console.WriteLine($"{c.Key}->{c.Count()}");
+            }
         }
 
         public TrophyDeckModel[] GatherTrophyDecksData(Set set, DraftType draftType)
@@ -113,31 +77,6 @@ namespace LimitedPower.Analytics.Core
             var limitedEventJson = _seventeenLandsApi.GetJson(
                 $"https://www.17lands.com/data/deck?draft_id={draftId}&deck_index={deckIndex}");
             return JsonSerializer.Deserialize<LimitedEventModel>(limitedEventJson);
-        }
-
-        public CardRating[] GatherCardRatingsData(Set set, DraftType draftType, DateTime start, DateTime end, DataTimespan dataTimespan, ColorCombination colorCombination)
-        {
-            var requestString = $"card_ratings/data?expansion={set.ToString().ToUpper()}" +
-                                $"&format={draftType}&start_date={start.ToString(Const.DateFormat)}&end_date={end.ToString(Const.DateFormat)}";
-
-            if (colorCombination != ColorCombination.None) requestString += $"&colors={colorCombination}";
-
-            var cardsJson = _seventeenLandsApi.GetJson(requestString);
-            var cardRatings = JsonSerializer.Deserialize<CardRating[]>(cardsJson);
-            if (cardRatings == null)
-            {
-                // todo: log
-                return Array.Empty<CardRating>();
-            }
-
-            foreach (var cardRating in cardRatings)
-            {
-                cardRating.DraftType = draftType;
-                cardRating.DataTimespan = dataTimespan;
-                cardRating.DeckColor = colorCombination;
-            }
-
-            return cardRatings;
         }
     }
 }
